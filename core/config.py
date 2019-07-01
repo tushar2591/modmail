@@ -3,13 +3,16 @@ import json
 import os
 import typing
 
+from dotenv import load_dotenv
 import isodate
-
 from discord.ext.commands import BadArgument
 
 from core._color_data import ALL_COLORS
 from core.models import InvalidConfigError
 from core.time import UserFriendlyTime
+
+
+load_dotenv()
 
 
 class ConfigManager:
@@ -62,6 +65,7 @@ class ConfigManager:
         "oauth_whitelist",
         # moderation
         "blocked",
+        "blocked_whitelist",
         "command_permissions",
         "level_permissions",
         # threads
@@ -126,6 +130,7 @@ class ConfigManager:
             "plugins": [],
             "aliases": {},
             "blocked": {},
+            "blocked_whitelist": [],
             "oauth_whitelist": [],
             "command_permissions": {},
             "level_permissions": {},
