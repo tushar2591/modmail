@@ -10,7 +10,7 @@
   </a>
 
   <a href="https://github.com/kyb3r/modmail/">
-    <img src="https://api.modmail.tk/badges/instances.svg" alt="Bot instances">
+    <img src="https://api.logviewer.tech/badges/instances.svg" alt="Bot instances">
   </a>
 
   <a href="https://discord.gg/j5e9p8w">
@@ -82,7 +82,9 @@ This list is ever-growing thanks to active development and our exceptional contr
 
 ## Installation
 
-Where is the Modmail bot invite link? Unfortunately, due to how this bot functions, it cannot be invited. This is to ensure the individuality to your server and grant you full control over your bot and data. Nonetheless, you can easily obtain a free copy of Modmail for your server by following one of the methods listed below (roughly takes 15 minutes of your time):
+Where can I find the Modmail bot invite link? 
+
+Unfortunately, due to how this bot functions, it cannot be invited. This is to ensure the individuality to your server and grant you full control over your bot and data. Nonetheless, you can easily obtain a free copy of Modmail for your server by following one of the methods listed below (roughly takes 15 minutes of your time)...
 
 ### Heroku
 
@@ -98,13 +100,13 @@ To configure automatic updates:
  - Then go to the Deploy tab in your [Heroku account](https://dashboard.heroku.com/apps) of your bot app, select GitHub and connect your fork (usually by typing "Modmail"). 
  - Turn on auto-deploy for the `master` branch.
 
-### Hosting for patrons
+### Hosting for Patreons
 
-If you don't want to go through the trouble of setting up your very own Modmail bot, and/or want to support this project, we offer the all inclusive installation, hosting and maintenance of your Modmail with [**Patron**](https://patreon.com/kyber). Join our [Modmail Discord Server](https://discord.gg/etJNHCQ) for more info! 
+If you don't want to go through the trouble of setting up your very own Modmail bot, and/or want to support this project, we offer the all inclusive installation, hosting and maintenance of your Modmail with [**Patreon**](https://patreon.com/kyber). Join our [Modmail Discord Server](https://discord.gg/etJNHCQ) for more info! 
 
 ### Locally
 
-Local hosting of Modmail is also possible, first you will need [`python 3.7`](https://www.python.org/downloads/).
+Local hosting of Modmail is also possible, first you will need [`Python 3.7`](https://www.python.org/downloads/).
 
 Follow the [**installation guide**](https://github.com/kyb3r/modmail/wiki/Installation) and disregard deploying the Heroku bot application. If you run into any problems, join our [Modmail Discord Server](https://discord.gg/etJNHCQ) for help and support.
 
@@ -129,12 +131,51 @@ Finally, start Modmail.
 $ pipenv run bot
 ```
 
+#### Docker
+
+This repo supplies a Dockerfile for simplified deployment. 
+
+You can build your own Docker image:
+
+```console
+$ docker build . --tag=modmail
+```
+
+or run directly from a pre-built version from https://hub.docker.com/. Currently there are two community release of Modmail:
+
+- Kyber's:
+
+```console
+$ docker pull kyb3rr/modmail
+```
+
+- Taku's:
+
+```console
+$ docker pull taaku18/modmail
+# You can also choose one of the following:
+$ docker pull taaku18/modmail:dev
+$ docker pull taaku18/modmail:<version>  (<version> ex: 3.2.0, 3.2, etc.)
+```
+
+And to run your docker image:
+
+```console
+$ docker run --env-file .env user/modmail
+```
+- Replace `user/modmail` with `kyb3rr/modmail`, `taaku18/modmail`, `taaku18/modmail:3.2`, etc as above.
+- `.env` should be the path to your env file, you can also supply a path: `/path/to/.env`.
+
 ## Sponsors
 
 Special thanks to our sponsors for supporting the project.
 
 <a href='https://www.youtube.com/channel/UCgSmBJD9imASmJRleycTCwQ/featured'>
-  <img height=150 src='https://i.imgur.com/WyzaPKY.png' style='margin:10'>
+  <img height=150 src='https://i.imgur.com/WyzaPKY.png' style='margin:10px'>
+</a>
+
+<a href='https://discord.gg/PmHHVt9'>
+  <img height=150 src='https://imgur.com/8F18l3v.png' style='margin:10px'>
 </a>
 
 Become a sponsor on [Patreon](https://patreon.com/kyber).

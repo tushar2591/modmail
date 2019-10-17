@@ -1,4 +1,4 @@
-__version__ = "3.1.1"
+__version__ = "3.2.2"
 
 import asyncio
 import logging
@@ -29,10 +29,11 @@ try:
 except ImportError:
     pass
 
+from core import checks
 from core.clients import ApiClient, PluginDatabaseClient
 from core.config import ConfigManager
 from core.utils import human_join, strtobool, parse_alias
-from core.models import PermissionLevel, ModmailLogger
+from core.models import PermissionLevel, ModmailLogger, SafeFormatter
 from core.thread import ThreadManager
 from core.time import human_timedelta
 
@@ -68,6 +69,7 @@ class ModmailBot(commands.Bot):
         self._session = None
         self._api = None
         self.metadata_loop = None
+        self.formatter = SafeFormatter()
 
         self._connected = asyncio.Event()
         self.start_time = datetime.utcnow()
@@ -119,7 +121,7 @@ class ModmailBot(commands.Bot):
         if days:
             fmt = "{d}d " + fmt
 
-        return fmt.format(d=days, h=hours, m=minutes, s=seconds)
+        return self.formatter.format(fmt, d=days, h=hours, m=minutes, s=seconds)
 
     def _configure_logging(self):
         level_text = self.config["log_level"].upper()
@@ -293,6 +295,8 @@ class ModmailBot(commands.Bot):
             except ValueError:
                 self.config.remove("guild_id")
                 logger.critical("Invalid GUILD_ID set.")
+        else:
+            logger.debug("No GUILD_ID set.")
         return None
 
     @property
@@ -382,6 +386,34 @@ class ModmailBot(commands.Bot):
     def main_color(self) -> int:
         return self._parse_color("main_color")
 
+    def command_perm(self, command_name: str) -> PermissionLevel:
+        level = self.config["override_command_level"].get(command_name)
+        if level is not None:
+            try:
+                return PermissionLevel[level.upper()]
+            except KeyError:
+                logger.warning(
+                    "Invalid override_command_level for command %s.", command_name
+                )
+                self.config["override_command_level"].pop(command_name)
+
+        command = self.get_command(command_name)
+        if command is None:
+            logger.debug("Command %s not found.", command_name)
+            return PermissionLevel.INVALID
+        level = next(
+            (
+                check.permission_level
+                for check in command.checks
+                if hasattr(check, "permission_level")
+            ),
+            None,
+        )
+        if level is None:
+            logger.debug("Command %s does not have a permission level.", command_name)
+            return PermissionLevel.INVALID
+        return level
+
     async def on_connect(self):
         logger.line()
         try:
@@ -427,7 +459,7 @@ class ModmailBot(commands.Bot):
         await self.wait_for_connected()
 
         if self.guild is None:
-            logger.debug("Logging out due to invalid GUILD_ID.")
+            logger.error("Logging out due to invalid GUILD_ID.")
             return await self.logout()
 
         logger.line()
@@ -806,12 +838,23 @@ class ModmailBot(commands.Bot):
                 thread = await self.threads.find(channel=message.channel)
                 snippet = self.snippets[cmd]
                 if thread:
-                    snippet = snippet.format(recipient=thread.recipient)
+                    snippet = self.formatter.format(snippet, recipient=thread.recipient)
                 message.content = f"{self.prefix}reply {snippet}"
 
         ctxs = await self.get_contexts(message)
         for ctx in ctxs:
             if ctx.command:
+                if not any(
+                    1
+                    for check in ctx.command.checks
+                    if hasattr(check, "permission_level")
+                ):
+                    logger.debug(
+                        "Command %s has no permissions check, adding invalid level.",
+                        ctx.command.qualified_name,
+                    )
+                    checks.has_permissions(PermissionLevel.INVALID)(ctx.command)
+
                 await self.invoke(ctx)
                 continue
 
@@ -1039,12 +1082,23 @@ class ModmailBot(commands.Bot):
             await context.send_help(context.command)
         elif isinstance(exception, commands.CheckFailure):
             for check in context.command.checks:
-                if not await check(context) and hasattr(check, "fail_msg"):
-                    await context.send(
-                        embed=discord.Embed(
-                            color=discord.Color.red(), description=check.fail_msg
+                if not await check(context):
+                    if hasattr(check, "fail_msg"):
+                        await context.send(
+                            embed=discord.Embed(
+                                color=discord.Color.red(), description=check.fail_msg
+                            )
                         )
-                    )
+                    if hasattr(check, "permission_level"):
+                        corrected_permission_level = self.command_perm(
+                            context.command.qualified_name
+                        )
+                        logger.warning(
+                            "User %s does not have permission to use this command: `%s` (%s).",
+                            context.author.name,
+                            context.command.qualified_name,
+                            corrected_permission_level.name,
+                        )
             logger.warning("CheckFailure: %s", exception)
         else:
             logger.error("Unexpected exception:", exc_info=exception)
@@ -1097,12 +1151,13 @@ class ModmailBot(commands.Bot):
             "last_updated": str(datetime.utcnow()),
         }
 
-        async with self.session.post("https://api.modmail.tk/metadata", json=data):
+        async with self.session.post("https://api.logviewer.tech/metadata", json=data):
             logger.debug("Uploading metadata to Modmail server.")
 
     async def before_post_metadata(self):
-        logger.info("Starting metadata loop.")
         await self.wait_for_connected()
+        logger.debug("Starting metadata loop.")
+        logger.line()
         if not self.guild:
             self.metadata_loop.cancel()
 

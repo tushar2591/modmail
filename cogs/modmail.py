@@ -17,7 +17,7 @@ from core.decorators import trigger_typing
 from core.models import PermissionLevel
 from core.paginator import EmbedPaginatorSession
 from core.time import UserFriendlyTime, human_timedelta
-from core.utils import format_preview, User, create_not_found_embed, format_description
+from core.utils import format_preview, User, create_not_found_embed, format_description, strtobool
 
 logger = logging.getLogger("Modmail")
 
@@ -286,14 +286,35 @@ class Modmail(commands.Cog):
     @commands.command()
     @checks.has_permissions(PermissionLevel.MODERATOR)
     @checks.thread_only()
-    async def move(self, ctx, *, category: discord.CategoryChannel):
+    async def move(self, ctx, category: discord.CategoryChannel, *, specifics: str = None):
         """
         Move a thread to another category.
 
         `category` may be a category ID, mention, or name.
+        `specifics` is a string which takes in arguments on how to perform the move. Ex: "silently"
         """
         thread = ctx.thread
+        silent = False
+
+        if specifics:
+            silent_words = ['silent', 'silently']
+            silent = any(word in silent_words for word in specifics.split())
+
         await thread.channel.edit(category=category, sync_permissions=True)
+
+        try:
+            thread_move_notify = strtobool(self.bot.config["thread_move_notify"])
+        except ValueError:
+            thread_move_notify = self.bot.config.remove("thread_move_notify")
+
+        if thread_move_notify and not silent:
+            embed = discord.Embed(
+                title="Thread Moved",
+                description=self.bot.config["thread_move_response"],
+                color=self.bot.main_color
+            )
+            await thread.recipient.send(embed=embed)
+
         sent_emoji, _ = await self.bot.retrieve_emoji()
         try:
             await ctx.message.add_reaction(sent_emoji)
@@ -912,10 +933,10 @@ class Modmail(commands.Cog):
                 line = mention + f" - `{reason or 'No reason provided'}`\n"
                 if len(embed.description) + len(line) > 2048:
                     embed = discord.Embed(
-                            title="Blocked Users (Continued)",
-                            color=self.bot.main_color,
-                            description=line,
-                        )
+                        title="Blocked Users (Continued)",
+                        color=self.bot.main_color,
+                        description=line,
+                    )
                     embeds.append(embed)
                 else:
                     embed.description += line
@@ -1012,6 +1033,8 @@ class Modmail(commands.Cog):
 
         mention = getattr(user, "mention", f"`{user.id}`")
 
+        moderator = ctx.author.name
+
         if str(user.id) in self.bot.blocked_whitelisted_users:
             embed = discord.Embed(
                 title="Error",
@@ -1021,7 +1044,7 @@ class Modmail(commands.Cog):
             return await ctx.send(embed=embed)
 
         if after is not None:
-            reason = after.arg
+            reason = f"{after.arg} by {moderator}"
             if reason.startswith("System Message: "):
                 raise commands.BadArgument(
                     "The reason cannot start with `System Message:`."
@@ -1029,10 +1052,10 @@ class Modmail(commands.Cog):
             if "%" in reason:
                 raise commands.BadArgument('The reason contains illegal character "%".')
             if after.dt > after.now:
-                reason = f"{reason} %{after.dt.isoformat()}%"
+                reason = f"{reason} %{after.dt.isoformat()}% by {moderator}"
 
         if not reason:
-            reason = None
+            reason = f"Blocked by {moderator}"
 
         extend = f" for `{reason}`" if reason is not None else ""
         msg = self.bot.blocked_users.get(str(user.id))
@@ -1046,7 +1069,7 @@ class Modmail(commands.Cog):
         ):
             if str(user.id) in self.bot.blocked_users:
 
-                old_reason = msg.strip().rstrip(".") or "no reason"
+                old_reason = msg.strip().rstrip(".") or f"Blocked by {moderator}"
                 embed = discord.Embed(
                     title="Success",
                     description=f"{mention} was previously blocked for "
